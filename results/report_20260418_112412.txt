@@ -1,0 +1,32 @@
+============================================================
+  EMERGENCY-FOCUSED V2V INTELLIGENCE - SIMULATION REPORT
+  Team: Ch Rakesh | G Adarsh | N JayVardhan
+  Faculty: Mr Naqueeb Ahmed
+============================================================
+  Generated: 2026-04-18 11:26:20
+
+  ML MODEL PERFORMANCE
+  ─────────────────────────────────
+  Random Forest AUC      : 1.0000
+  Random Forest Accuracy : 0.9994
+  LSTM Trajectory R²     : 0.9696
+
+  NETWORK METRICS
+  ─────────────────────────────────
+  Avg Packet Delivery Ratio : 0.5891
+  Avg End-to-End Delay (ms) : 1.10
+  Total Beacons Sent        : 25463
+  Total Alerts Relayed      : 4760
+
+  SAFETY IMPACT
+  ─────────────────────────────────
+  Collisions (no V2V)    : 2063
+  Collisions (with V2V)  : 1977
+  Collisions Prevented   : 83
+  Vehicles Saved         : 1
+  Saved Vehicle IDs      : yield_04
+
+  EMERGENCY RESPONSE
+  ─────────────────────────────────
+
+============================================================

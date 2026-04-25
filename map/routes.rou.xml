@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+
+    <!-- VEHICLE TYPES -->
+    <vType id="normal_car"
+           accel="2.6" decel="4.5" emergencyDecel="9.0"
+           length="4.5" minGap="2.5" maxSpeed="13.89"
+           sigma="0.5" color="0.8,0.8,0.8" vClass="passenger"/>
+
+    <vType id="brake_fail"
+           accel="3.5" decel="0.3" emergencyDecel="0.5"
+           length="4.5" minGap="1.0" maxSpeed="22.0"
+           sigma="0.0" color="1.0,0.0,0.0" vClass="passenger"/>
+
+    <vType id="wrong_way"
+           accel="2.0" decel="3.0" emergencyDecel="6.0"
+           length="4.5" minGap="1.5" maxSpeed="15.0"
+           sigma="0.2" color="1.0,0.3,0.0" vClass="passenger"/>
+
+    <!-- Ambulance: MUCH BIGGER (length=10), bright pink, emergency shape -->
+    <vType id="ambulance"
+           accel="3.5" decel="5.0" emergencyDecel="9.0"
+           length="10.0" width="3.0" minGap="2.0" maxSpeed="16.67"
+           sigma="0.0" color="1.0,0.2,0.6"
+           vClass="emergency" guiShape="emergency"/>
+
+    <!-- Firetruck: MUCH BIGGER (length=12), bright red, firebrigade shape -->
+    <vType id="firetruck"
+           accel="2.5" decel="4.5" emergencyDecel="8.0"
+           length="12.0" width="3.5" minGap="2.5" maxSpeed="14.0"
+           sigma="0.0" color="1.0,0.0,0.0"
+           vClass="emergency" guiShape="firebrigade"/>
+
+    <!-- ROUTES -->
+    <route id="N_to_S" edges="N_in S_out"/>
+    <route id="N_to_E" edges="N_in E_out"/>
+    <route id="N_to_W" edges="N_in W_out"/>
+    <route id="S_to_N" edges="S_in N_out"/>
+    <route id="S_to_E" edges="S_in E_out"/>
+    <route id="S_to_W" edges="S_in W_out"/>
+    <route id="E_to_W" edges="E_in W_out"/>
+    <route id="E_to_N" edges="E_in N_out"/>
+    <route id="E_to_S" edges="E_in S_out"/>
+    <route id="W_to_E" edges="W_in E_out"/>
+    <route id="W_to_N" edges="W_in N_out"/>
+    <route id="W_to_S" edges="W_in S_out"/>
+
+    <!-- PHASE 1: NORMAL TRAFFIC t=2-20s -->
+    <vehicle id="car_01" type="normal_car" route="N_to_S" depart="2.0"  departLane="best" departSpeed="10"/>
+    <vehicle id="car_02" type="normal_car" route="S_to_N" depart="3.0"  departLane="best" departSpeed="10"/>
+    <vehicle id="car_03" type="normal_car" route="E_to_W" depart="4.0"  departLane="best" departSpeed="10"/>
+    <vehicle id="car_04" type="normal_car" route="W_to_E" depart="5.0"  departLane="best" departSpeed="10"/>
+    <vehicle id="car_05" type="normal_car" route="N_to_E" depart="6.0"  departLane="best" departSpeed="9"/>
+    <vehicle id="car_06" type="normal_car" route="S_to_W" depart="7.0"  departLane="best" departSpeed="11"/>
+    <vehicle id="car_07" type="normal_car" route="E_to_N" depart="8.0"  departLane="best" departSpeed="10"/>
+    <vehicle id="car_08" type="normal_car" route="W_to_S" depart="9.0"  departLane="best" departSpeed="9"/>
+    <vehicle id="car_09" type="normal_car" route="N_to_W" depart="10.0" departLane="best" departSpeed="10"/>
+    <vehicle id="car_10" type="normal_car" route="S_to_E" depart="11.0" departLane="best" departSpeed="10"/>
+    <vehicle id="car_11" type="normal_car" route="E_to_S" depart="12.0" departLane="best" departSpeed="11"/>
+    <vehicle id="car_12" type="normal_car" route="W_to_N" depart="13.0" departLane="best" departSpeed="9"/>
+    <vehicle id="car_13" type="normal_car" route="N_to_S" depart="15.0" departLane="best" departSpeed="10"/>
+    <vehicle id="car_14" type="normal_car" route="S_to_N" depart="16.0" departLane="best" departSpeed="10"/>
+    <vehicle id="car_15" type="normal_car" route="E_to_W" depart="17.0" departLane="best" departSpeed="12"/>
+    <vehicle id="car_16" type="normal_car" route="W_to_E" depart="18.0" departLane="best" departSpeed="10"/>
+    <vehicle id="car_17" type="normal_car" route="N_to_E" depart="19.0" departLane="best" departSpeed="9"/>
+    <vehicle id="car_18" type="normal_car" route="S_to_W" depart="20.0" departLane="best" departSpeed="10"/>
+
+    <!-- PHASE 2: BRAKE FAILURE + WRONG-WAY t=25s -->
+    <vehicle id="brake_fail_01" type="brake_fail" route="W_to_E" depart="25.0" departLane="best" departSpeed="16.0"/>
+    <vehicle id="wrong_way_01"  type="wrong_way"  route="E_to_W" depart="25.0" departLane="best" departSpeed="13.0"/>
+    <vehicle id="react_01" type="normal_car" route="W_to_E" depart="26.0" departLane="best" departSpeed="10"/>
+    <vehicle id="react_02" type="normal_car" route="E_to_W" depart="26.0" departLane="best" departSpeed="10"/>
+    <vehicle id="react_03" type="normal_car" route="N_to_S" depart="27.0" departLane="best" departSpeed="10"/>
+    <vehicle id="react_04" type="normal_car" route="S_to_N" depart="27.0" departLane="best" departSpeed="10"/>
+
+    <!-- PHASE 3: PEDESTRIAN t=40s -->
+    <vehicle id="ped_01"  type="normal_car" route="N_to_S" depart="40.0" departLane="best" departSpeed="0.5"/>
+    <vehicle id="car_p1"  type="normal_car" route="N_to_S" depart="40.5" departLane="best" departSpeed="11"/>
+    <vehicle id="car_p2"  type="normal_car" route="N_to_S" depart="41.0" departLane="best" departSpeed="10"/>
+
+    <!-- PHASE 4: EMERGENCY VEHICLES t=54-56s -->
+    <vehicle id="yield_01" type="normal_car" route="N_to_S" depart="54.0" departLane="best" departSpeed="10"/>
+    <vehicle id="yield_02" type="normal_car" route="E_to_W" depart="54.0" departLane="best" departSpeed="10"/>
+    <vehicle id="yield_03" type="normal_car" route="W_to_E" depart="54.0" departLane="best" departSpeed="10"/>
+    <vehicle id="yield_04" type="normal_car" route="S_to_N" depart="54.5" departLane="best" departSpeed="10"/>
+    <vehicle id="ambulance_01" type="ambulance" route="W_to_E" depart="55.0" departLane="best" departSpeed="13.0"/>
+    <vehicle id="yield_05" type="normal_car" route="N_to_E" depart="55.5" departLane="best" departSpeed="9"/>
+    <vehicle id="yield_06" type="normal_car" route="E_to_S" depart="55.5" departLane="best" departSpeed="10"/>
+    <vehicle id="firetruck_01" type="firetruck" route="S_to_N" depart="56.0" departLane="best" departSpeed="12.0"/>
+
+</routes>
