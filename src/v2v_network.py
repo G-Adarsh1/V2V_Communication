@@ -35,6 +35,8 @@ class Beacon:
     hop:        int   = 0
     seq:        int   = 0
     ttl:        int   = HOP_LIMIT
+    is_emergency: bool = False
+    emergency_role: str = ''   # e.g., AMBULANCE / FIRETRUCK
 
 @dataclass
 class VehicleState:
@@ -51,6 +53,8 @@ class VehicleState:
     alert_type:   str  = ''
     seen_alerts:  Set  = field(default_factory=set)
     neighbors:    Dict = field(default_factory=dict)  # vid -> Beacon
+    is_emergency: bool = False
+    emergency_role: str = ''
 
 class V2VNetwork:
     def __init__(self, plr: float = 0.0, seed: int = 42):
@@ -74,10 +78,13 @@ class V2VNetwork:
     def remove(self, vid: str):
         self.vehicles.pop(vid, None)
 
-    def update_state(self, vid: str, x, y, speed, accel, direction):
+    def update_state(self, vid: str, x, y, speed, accel, direction,
+                     is_emergency: bool = False, emergency_role: str = ''):
         if vid not in self.vehicles: self.register(vid)
         vs = self.vehicles[vid]
         vs.x=x; vs.y=y; vs.speed=speed; vs.accel=accel; vs.direction=direction
+        vs.is_emergency = is_emergency
+        vs.emergency_role = emergency_role
         vs.history.append({'x':x,'y':y,'speed':speed,'direction':direction,'t':time.time()})
         if len(vs.history) > 100: vs.history.pop(0)
 
@@ -126,7 +133,9 @@ class V2VNetwork:
                        accel=vs.accel, direction=vs.direction,
                        risk=vs.risk, alert=vs.alert_active,
                        alert_type=vs.alert_type,
-                       hop=0, seq=vs.seq, ttl=HOP_LIMIT)
+                       hop=0, seq=vs.seq, ttl=HOP_LIMIT,
+                       is_emergency=vs.is_emergency,
+                       emergency_role=vs.emergency_role)
             beacons[vs.vid] = b
             self.beacons_sent += 1
 
@@ -161,6 +170,15 @@ class V2VNetwork:
 
         # Multi-hop alert relay
         alert_beacons = [b for b in beacons.values() if b.alert and b.ttl > 0]
+        # Dedicated emergency status beacon in addition to standard state beacons.
+        # This gives nearby vehicles explicit emergency intent + kinematics.
+        for b in beacons.values():
+            if b.is_emergency:
+                emg_b = Beacon(**b.__dict__)
+                emg_b.alert = True
+                emg_b.alert_type = 'EMERGENCY_STATUS'
+                emg_b.ttl = HOP_LIMIT
+                alert_beacons.append(emg_b)
         for ab in alert_beacons:
             self._multihop_relay(ab, vlist, set())
 
@@ -191,13 +209,15 @@ class V2VNetwork:
         return features
 
     def _multihop_relay(self, alert: Beacon, vlist, seen: Set):
-        key = f"{alert.vid}_{alert.seq}"
+        # Include alert type so emergency-status relay does not get deduplicated
+        # against a regular alert beacon from the same sender/sequence.
+        key = f"{alert.vid}_{alert.seq}_{alert.alert_type}"
         if key in seen or alert.ttl <= 0: return
         seen.add(key)
         relayed = Beacon(**alert.__dict__)
         relayed.hop += 1; relayed.ttl -= 1
         for vs in vlist:
-            if vs.vid == alert.vid: return
+            if vs.vid == alert.vid: continue
             dist = self._dist(vs.x,vs.y,alert.x,alert.y)
             ok,_ = self._deliver(dist)
             if ok:
@@ -209,7 +229,9 @@ class V2VNetwork:
                         'from': alert.vid,
                         'to':   vs.vid,
                         'type': alert.alert_type,
-                        'hop':  relayed.hop
+                        'hop':  relayed.hop,
+                        'is_emergency': alert.is_emergency,
+                        'emergency_role': alert.emergency_role
                     })
                     self._multihop_relay(relayed, vlist, seen)
 
