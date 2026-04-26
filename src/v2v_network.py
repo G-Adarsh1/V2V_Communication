@@ -197,7 +197,7 @@ class V2VNetwork:
         relayed = Beacon(**alert.__dict__)
         relayed.hop += 1; relayed.ttl -= 1
         for vs in vlist:
-            if vs.vid == alert.vid: return
+            if vs.vid == alert.vid: continue   # FIX: was `return`, killed entire relay
             dist = self._dist(vs.x,vs.y,alert.x,alert.y)
             ok,_ = self._deliver(dist)
             if ok:
