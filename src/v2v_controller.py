@@ -119,6 +119,7 @@ class V2VController:
         self.corridor_clear  = False
         self.tl_overridden   = False
         self.tl_ids          = []
+        self._corridor_closed_once = False
 
         # Track what we did to each vehicle so we can undo it
         self.pullover_vids   = set()   # on same road: pulling aside
@@ -361,13 +362,24 @@ class V2VController:
           → Restore traffic lights
         """
         emg_present = [v for v in self.EMG_VEHICLES if v in cur]
-        if not emg_present: return
+        if not emg_present:
+            # Re-arm one-shot close guard only after emergency vehicles leave.
+            self._corridor_closed_once = False
+            return
+
+        # Corridor already closed for the current emergency pass.
+        # Keep this step deterministic by skipping re-activation/re-close spam
+        # until emergency vehicles fully leave the network.
+        if self._corridor_closed_once:
+            return
 
         # First activation
         if not self.emg_active:
             self.emg_active  = True
             self.emg_entry_t = self.sim_t
             self.report.emg_entry_t = self.sim_t
+            self.corridor_clear = False
+            self._reset_corridor_runtime_state()
             self._log("EMERGENCY CORRIDOR ACTIVATED")
             if self.dash:
                 self.dash.log("", 'INFO')
@@ -507,6 +519,9 @@ class V2VController:
         if (self.corridor_clear
                 and self.sim_t > self.emg_entry_t + 25
                 and self.tl_overridden):
+            if self._corridor_closed_once:
+                return
+
             # Restore traffic lights
             for tl in self.tl_ids:
                 try: traci.trafficlight.setProgram(tl, '0')
@@ -526,6 +541,35 @@ class V2VController:
                         self.restored_vids.add(vid)
                         self.risk_state[vid] = 'SAFE'
                     except: pass
+
+            self._clear_emergency_alerts(cur)
+            self.emg_active = False
+            self.corridor_clear = False
+            self._corridor_closed_once = True
+            self._reset_corridor_runtime_state()
+
+
+    def _reset_corridor_runtime_state(self):
+        self.pullover_vids.clear()
+        self.waiting_vids.clear()
+        self.restored_vids.clear()
+        # Optional runtime markers used by corridor arbitration variants.
+        for attr, default in (
+            ('blocked_count', 0),
+            ('blocked_counter', 0),
+            ('blocked_counters', {}),
+            ('winner_id', None),
+            ('pass_marker', None),
+            ('pass_markers', set()),
+        ):
+            if hasattr(self, attr):
+                setattr(self, attr, default.copy() if isinstance(default, (set, dict)) else default)
+
+    def _clear_emergency_alerts(self, cur):
+        for emg_id in self.EMG_VEHICLES:
+            self.net.clear_alert(emg_id)
+            if emg_id in cur:
+                self.risk_state[emg_id] = 'SAFE'
 
     # ═══════════════════════════════════════════════════════════
     def _speed_zone(self, cur):
