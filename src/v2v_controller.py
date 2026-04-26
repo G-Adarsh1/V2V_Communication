@@ -608,3 +608,34 @@ class V2VController:
 
     def _log(self, msg):
         print(f"[{self.sim_t:6.1f}s] {msg}")
+
+    
+    def _make_space_either_lane(self, vid):
+      try:
+          lane_i = traci.vehicle.getLaneIndex(vid)
+          lane_n = traci.vehicle.getLaneNumber(vid)
+      except:
+          return
+  
+      target = None
+      # right available?
+      try:
+          if lane_i > 0 and traci.vehicle.couldChangeLane(vid, -1):
+              target = lane_i - 1
+      except:
+          pass
+      # left available?
+      if target is None:
+          try:
+              if lane_i < lane_n - 1 and traci.vehicle.couldChangeLane(vid, 1):
+                  target = lane_i + 1
+          except:
+              pass
+      if target is None:
+          return
+  
+      try:
+          traci.vehicle.changeLane(vid, target, 5.0)
+      except:
+          pass
+    
