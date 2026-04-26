@@ -127,6 +127,7 @@ class V2VController:
         self.restored_vids   = set()   # already restored
 
         # Impact
+        self._winner_stuck_steps = 0
         self.collision_count = 0
         self.saved_vids      = set()
         self.prevented       = 0
@@ -339,237 +340,182 @@ class V2VController:
         except: pass
 
     # ═══════════════════════════════════════════════════════════
-    def _emergency_corridor(self, cur):
-        """
-        CORRECT corridor logic:
+  def _emergency_corridor(self, cur):
+    emg_present = [v for v in self.EMG_VEHICLES if v in cur]
 
-        For each emergency vehicle (ambulance / firetruck):
-          → Set it to full speed, ignore signals (it keeps moving always)
+    # Re-arm close latch only after all emergency vehicles leave
+    if not emg_present:
+        self._corridor_closed_once = False
+        self.emg_active = False
+        self.corridor_clear = False
+        return
 
-          → For normal vehicles within 150m:
-              IF on same road axis as emergency vehicle:
-                  → Pull to rightmost lane (changeLane 0)
-                  → Reduce speed to 3 m/s (slow crawl alongside)
-                  → This lets the emergency vehicle overtake them
-              IF on crossing/different road:
-                  → Stop completely (they are blocking the junction)
-                  → They wait until emergency vehicle passes
+    # Prevent repeated open/close loop in same EV cycle
+    if self._corridor_closed_once:
+        return
 
-          → Traffic light: green for emergency vehicle direction
-
-        After emergency vehicle passes the intersection:
-          → Restore all vehicles to normal speed/mode
-          → Restore traffic lights
-        """
-        emg_present = [v for v in self.EMG_VEHICLES if v in cur]
-        if not emg_present:
-            # Re-arm one-shot close guard only after emergency vehicles leave.
-            self._corridor_closed_once = False
-            return
-
-        # Corridor already closed for the current emergency pass.
-        # Keep this step deterministic by skipping re-activation/re-close spam
-        # until emergency vehicles fully leave the network.
-        if self._corridor_closed_once:
-            return
-
-        # First activation
-        if not self.emg_active:
-            self.emg_active  = True
-            self.emg_entry_t = self.sim_t
-            self.report.emg_entry_t = self.sim_t
-            self.corridor_clear = False
-            self._reset_corridor_runtime_state()
-            self._log("EMERGENCY CORRIDOR ACTIVATED")
-            if self.dash:
-                self.dash.log("", 'INFO')
-                self.dash.log("═══ EMERGENCY CORRIDOR ACTIVE ═══", 'EMERGENCY')
-                self.dash.log(f"Ambulance : {self.AMBULANCE}", 'EMERGENCY')
-                self.dash.log(f"Fire Truck: {self.FIRETRUCK}", 'EMERGENCY')
-                self.dash.log("", 'INFO')
-                self.dash.set_emergency_priority(True)
-                self.dash.update_impact(
-                    len(self.saved_vids), self.prevented,
-                    emg_vehicles=f"{self.AMBULANCE}, {self.FIRETRUCK}")
-
-        # Traffic light: green for all (simplest safe option)
-        if not self.tl_overridden:
-            for tl in self.tl_ids:
-                try:
-                    traci.trafficlight.setPhase(tl, 0)
-                    traci.trafficlight.setPhaseDuration(tl, 9999)
-                    if self.dash:
-                        self.dash.log(f"TL OVERRIDE: {tl} -> GREEN",'EMERGENCY')
-                except: pass
-            self.tl_overridden = True
-
-        # Get emergency vehicle positions and edges
-        emg_info = {}   # emg_id -> (x, y, edge)
-        for emg_id in emg_present:
-            try:
-                ex, ey = traci.vehicle.getPosition(emg_id)
-                edge   = _get_edge(emg_id)
-                emg_info[emg_id] = (ex, ey, edge)
-            except: pass
-
-        # ── STEP 1: Emergency vehicles always move freely ─────
-        for emg_id in emg_present:
-            try:
-                traci.vehicle.setSpeedMode(emg_id, 7)    # ignore signals
-                traci.vehicle.setLaneChangeMode(emg_id, 0)
-                traci.vehicle.setSpeed(emg_id, 13.5)     # full speed always
-                self.net.set_alert(emg_id, 'EMERGENCY_VEHICLE')
-                self.risk_state[emg_id] = 'SAFE'
-            except: pass
-
-        # ── STEP 2: Handle normal vehicles ───────────────────
-        for vid in cur:
-            if vid in self.EMG_VEHICLES: continue   # never touch emg vehicles
-
-            try:
-                vx, vy = traci.vehicle.getPosition(vid)
-            except: continue
-
-            # Find nearest emergency vehicle and distance
-            nearest_emg  = None
-            nearest_dist = float('inf')
-            for emg_id, (ex, ey, _) in emg_info.items():
-                d = math.sqrt((vx-ex)**2+(vy-ey)**2)
-                if d < nearest_dist:
-                    nearest_dist = d
-                    nearest_emg  = emg_id
-
-            if nearest_emg is None: continue
-
-            if nearest_dist < 150.0:
-                # Vehicle is close to an emergency vehicle
-                is_same = _same_road(vid, nearest_emg)
-
-                if is_same:
-                    # ── PULL OVER: same road → slow down and move aside ──
-                    # Vehicle stays moving but gets out of the way
-                    try:
-                        traci.vehicle.setSpeedMode(vid, 31)   # normal mode
-                        # Slow to 3 m/s (crawl) — emergency vehicle overtakes
-                        cur_spd = traci.vehicle.getSpeed(vid)
-                        if cur_spd > 3.0:
-                            traci.vehicle.setSpeed(vid, 3.0)
-                        # Move to rightmost lane to make space
-                        try:
-                            traci.vehicle.changeLane(vid, 0, 5.0)
-                        except: pass
-                        self.risk_state[vid] = 'RISK'
-                        if vid not in self.pullover_vids:
-                            self.pullover_vids.add(vid)
-                            if self.dash:
-                                self.dash.log(
-                                    f"PULLING OVER: {vid} → lane 0, slowing",
-                                    'RISK')
-                    except: pass
-
-                else:
-                    # ── WAIT: crossing road → stop at junction ──────────
-                    # These vehicles would cross the ambulance's path
-                    try:
-                        traci.vehicle.setSpeedMode(vid, 0)
-                        traci.vehicle.setSpeed(vid, 0.0)
-                        self.risk_state[vid] = 'RISK'
-                        if vid not in self.waiting_vids:
-                            self.waiting_vids.add(vid)
-                            if self.dash:
-                                self.dash.log(
-                                    f"WAITING: {vid} stopped at crossing",
-                                    'RISK')
-                    except: pass
-
-            else:
-                # ── RESTORE: vehicle is far from emergency vehicle ────
-                # Restore to normal driving if we previously modified them
-                if vid in self.pullover_vids and vid not in self.restored_vids:
-                    try:
-                        traci.vehicle.setSpeedMode(vid, 31)
-                        traci.vehicle.setSpeed(vid, -1)
-                        self.restored_vids.add(vid)
-                        self.risk_state[vid] = 'SAFE'
-                    except: pass
-                if vid in self.waiting_vids and vid not in self.restored_vids:
-                    try:
-                        traci.vehicle.setSpeedMode(vid, 31)
-                        traci.vehicle.setSpeed(vid, -1)
-                        self.restored_vids.add(vid)
-                        self.risk_state[vid] = 'SAFE'
-                    except: pass
-
-        # ── STEP 3: Check corridor clear ──────────────────────
-        if not self.corridor_clear:
-            for emg_id, (ex, ey, _) in emg_info.items():
-                if math.sqrt(ex**2 + ey**2) < 120:
-                    self.corridor_clear     = True
-                    self.report.emg_clear_t = self.sim_t
-                    t_clear = self.sim_t - self.emg_entry_t
-                    self._log(f"CORRIDOR CLEAR — {emg_id} reached center in {t_clear:.1f}s")
-                    if self.dash:
-                        self.dash.log(
-                            f"CORRIDOR CLEAR — {emg_id} reached in {t_clear:.1f}s",
-                            'SAFE')
-                        self.dash.update_impact(
-                            len(self.saved_vids), self.prevented, t_clear)
-
-        # ── STEP 4: Restore after emergency passes ────────────
-        if (self.corridor_clear
-                and self.sim_t > self.emg_entry_t + 25
-                and self.tl_overridden):
-            if self._corridor_closed_once:
-                return
-
-            # Restore traffic lights
-            for tl in self.tl_ids:
-                try: traci.trafficlight.setProgram(tl, '0')
-                except: pass
-            self.tl_overridden = False
-            if self.dash:
-                self.dash.log("Traffic lights restored", 'INFO')
-                self.dash.log("═══ EMERGENCY CORRIDOR CLOSED ═══", 'INFO')
-                self.dash.set_emergency_priority(False)
-
-            # Restore ALL modified vehicles
-            for vid in (self.pullover_vids | self.waiting_vids):
-                if vid in cur and vid not in self.restored_vids:
-                    try:
-                        traci.vehicle.setSpeedMode(vid, 31)
-                        traci.vehicle.setSpeed(vid, -1)
-                        self.restored_vids.add(vid)
-                        self.risk_state[vid] = 'SAFE'
-                    except: pass
-
-            self._clear_emergency_alerts(cur)
-            self.emg_active = False
-            self.corridor_clear = False
-            self._corridor_closed_once = True
-            self._reset_corridor_runtime_state()
-
-
-    def _reset_corridor_runtime_state(self):
+    # First activation
+    if not self.emg_active:
+        self.emg_active  = True
+        self.emg_entry_t = self.sim_t
+        self.report.emg_entry_t = self.sim_t
+        self.corridor_clear = False
+        self._winner_stuck_steps = 0
         self.pullover_vids.clear()
         self.waiting_vids.clear()
         self.restored_vids.clear()
-        # Optional runtime markers used by corridor arbitration variants.
-        for attr, default in (
-            ('blocked_count', 0),
-            ('blocked_counter', 0),
-            ('blocked_counters', {}),
-            ('winner_id', None),
-            ('pass_marker', None),
-            ('pass_markers', set()),
-        ):
-            if hasattr(self, attr):
-                setattr(self, attr, default.copy() if isinstance(default, (set, dict)) else default)
+        self._log("EMERGENCY CORRIDOR ACTIVATED")
+        if self.dash:
+            self.dash.log("", 'INFO')
+            self.dash.log("═══ EMERGENCY CORRIDOR ACTIVE ═══", 'EMERGENCY')
+            self.dash.log(f"Ambulance : {self.AMBULANCE}", 'EMERGENCY')
+            self.dash.log(f"Fire Truck: {self.FIRETRUCK}", 'EMERGENCY')
+            self.dash.log("", 'INFO')
+            self.dash.set_emergency_priority(True)
 
-    def _clear_emergency_alerts(self, cur):
+    # TL preempt once per cycle
+    if not self.tl_overridden:
+        for tl in self.tl_ids:
+            try:
+                traci.trafficlight.setPhase(tl, 0)
+                traci.trafficlight.setPhaseDuration(tl, 9999)
+                if self.dash:
+                    self.dash.log(f"TL OVERRIDE: {tl} -> GREEN", 'EMERGENCY')
+            except:
+                pass
+        self.tl_overridden = True
+
+    # Collect EV positions
+    emg_info = {}
+    for emg_id in emg_present:
+        try:
+            ex, ey = traci.vehicle.getPosition(emg_id)
+            emg_info[emg_id] = (ex, ey, _get_edge(emg_id))
+        except:
+            pass
+
+    if not emg_info:
+        return
+
+    # Pick nearest-to-center emergency vehicle as priority
+    winner_id = min(
+        emg_info.keys(),
+        key=lambda eid: math.sqrt(emg_info[eid][0]**2 + emg_info[eid][1]**2)
+    )
+
+    # EV movement (winner full, others slow)
+    for emg_id in emg_present:
+        try:
+            if emg_id == winner_id:
+                traci.vehicle.setSpeedMode(emg_id, 7)
+                traci.vehicle.setLaneChangeMode(emg_id, 1621)  # allow overtaking
+                traci.vehicle.setSpeed(emg_id, 13.5)
+            else:
+                traci.vehicle.setSpeedMode(emg_id, 31)
+                traci.vehicle.slowDown(emg_id, 1.5, 2.0)
+            self.net.set_alert(emg_id, 'EMERGENCY_VEHICLE')
+            self.risk_state[emg_id] = 'SAFE'
+        except:
+            pass
+
+    wx, wy, _ = emg_info[winner_id]
+
+    # Deadlock breaker
+    try:
+        wspd = traci.vehicle.getSpeed(winner_id)
+        if wspd < 0.5:
+            self._winner_stuck_steps += 1
+        else:
+            self._winner_stuck_steps = 0
+    except:
+        pass
+
+    # Normal vehicles
+    for vid in cur:
+        if vid in self.EMG_VEHICLES:
+            continue
+        if vid in {self.BRAKE_FAIL, self.WRONG_WAY, self.PED}:  # do not corridor-control incident actors
+            continue
+
+        try:
+            vx, vy = traci.vehicle.getPosition(vid)
+        except:
+            continue
+
+        dist = math.sqrt((vx-wx)**2 + (vy-wy)**2)
+        if dist > 180.0:
+            # restore if we touched before
+            if vid in self.pullover_vids or vid in self.waiting_vids:
+                try:
+                    traci.vehicle.setSpeedMode(vid, 31)
+                    traci.vehicle.setSpeed(vid, -1)
+                    self.risk_state[vid] = 'SAFE'
+                    self.restored_vids.add(vid)
+                except:
+                    pass
+            continue
+
+        same = _same_road(vid, winner_id)
+
+        if same:
+            # only vehicles ahead should pull aside
+            if self._is_ahead_of_emergency(vid, winner_id):
+                try:
+                    traci.vehicle.setSpeedMode(vid, 31)
+                    traci.vehicle.slowDown(vid, 3.0, 2.0)
+                    self._make_space_either_lane(vid)  # most suitable side
+                    self.risk_state[vid] = 'RISK'
+                    self.pullover_vids.add(vid)
+                except:
+                    pass
+        else:
+            # stop only in tight conflict box near center
+            if math.sqrt(vx*vx + vy*vy) < 35.0:
+                try:
+                    traci.vehicle.setSpeedMode(vid, 0)
+                    traci.vehicle.slowDown(vid, 0.1, 2.0)
+                    self.risk_state[vid] = 'RISK'
+                    self.waiting_vids.add(vid)
+                except:
+                    pass
+
+    # corridor clear (priority EV passed center)
+    try:
+        ex, ey = traci.vehicle.getPosition(winner_id)
+        if math.sqrt(ex*ex + ey*ey) < 20.0:
+            self.corridor_clear = True
+            self.report.emg_clear_t = self.sim_t
+            t_clear = self.sim_t - self.emg_entry_t
+            self._log(f"CORRIDOR CLEAR — {winner_id} in {t_clear:.1f}s")
+    except:
+        pass
+
+    # restore once
+    if self.corridor_clear and self.tl_overridden and self.sim_t > self.emg_entry_t + 25:
+        for tl in self.tl_ids:
+            try:
+                traci.trafficlight.setProgram(tl, '0')
+            except:
+                pass
+        self.tl_overridden = False
+
+        for vid in (self.pullover_vids | self.waiting_vids):
+            if vid in cur:
+                try:
+                    traci.vehicle.setSpeedMode(vid, 31)
+                    traci.vehicle.setSpeed(vid, -1)
+                    self.risk_state[vid] = 'SAFE'
+                except:
+                    pass
+
         for emg_id in self.EMG_VEHICLES:
-            self.net.clear_alert(emg_id)
-            if emg_id in cur:
-                self.risk_state[emg_id] = 'SAFE'
+            try:
+                self.net.clear_alert(emg_id)
+            except:
+                pass
+
+        self._corridor_closed_once = True
+        self.emg_active = False
 
     # ═══════════════════════════════════════════════════════════
     def _speed_zone(self, cur):
