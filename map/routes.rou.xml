@@ -1,92 +1,82 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-        xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
-
-    <!-- VEHICLE TYPES -->
+<routes>
     <vType id="normal_car"
-           accel="2.6" decel="4.5" emergencyDecel="9.0"
-           length="4.5" minGap="2.5" maxSpeed="13.89"
-           sigma="0.5" color="0.8,0.8,0.8" vClass="passenger"/>
+           accel="2.2" decel="4.5" sigma="0.5"
+           length="5.0" minGap="2.5" maxSpeed="16.7"
+           color="0.8,0.8,0.8"/>
 
     <vType id="brake_fail"
-           accel="3.5" decel="0.3" emergencyDecel="0.5"
-           length="4.5" minGap="1.0" maxSpeed="22.0"
-           sigma="0.0" color="1.0,0.0,0.0" vClass="passenger"/>
+           accel="3.0" decel="0.1" sigma="0.2"
+           length="5.0" minGap="1.0" maxSpeed="22.2"
+           color="1.0,0.0,0.0"/>
 
     <vType id="wrong_way"
-           accel="2.0" decel="3.0" emergencyDecel="6.0"
-           length="4.5" minGap="1.5" maxSpeed="15.0"
-           sigma="0.2" color="1.0,0.3,0.0" vClass="passenger"/>
+           accel="2.5" decel="3.5" sigma="0.2"
+           length="5.0" minGap="1.0" maxSpeed="18.0"
+           color="1.0,0.4,0.0"/>
 
-    <!-- Ambulance: MUCH BIGGER (length=10), bright pink, emergency shape -->
     <vType id="ambulance"
-           accel="3.5" decel="5.0" emergencyDecel="9.0"
-           length="10.0" width="3.0" minGap="2.0" maxSpeed="16.67"
-           sigma="0.0" color="1.0,0.2,0.6"
-           vClass="emergency" guiShape="emergency"/>
+           accel="3.2" decel="5.0" sigma="0.1"
+           length="6.0" minGap="1.0" maxSpeed="25.0"
+           vClass="emergency" guiShape="emergency"
+           color="1.0,0.4,0.7"/>
 
-    <!-- Firetruck: MUCH BIGGER (length=12), bright red, firebrigade shape -->
     <vType id="firetruck"
-           accel="2.5" decel="4.5" emergencyDecel="8.0"
-           length="12.0" width="3.5" minGap="2.5" maxSpeed="14.0"
-           sigma="0.0" color="1.0,0.0,0.0"
-           vClass="emergency" guiShape="firebrigade"/>
+           accel="2.8" decel="5.0" sigma="0.1"
+           length="8.0" minGap="1.0" maxSpeed="22.0"
+           vClass="emergency" guiShape="truck"
+           color="0.9,0.1,0.1"/>
 
-    <!-- ROUTES -->
-    <route id="N_to_S" edges="N_in S_out"/>
-    <route id="N_to_E" edges="N_in E_out"/>
-    <route id="N_to_W" edges="N_in W_out"/>
-    <route id="S_to_N" edges="S_in N_out"/>
-    <route id="S_to_E" edges="S_in E_out"/>
-    <route id="S_to_W" edges="S_in W_out"/>
-    <route id="E_to_W" edges="E_in W_out"/>
-    <route id="E_to_N" edges="E_in N_out"/>
-    <route id="E_to_S" edges="E_in S_out"/>
-    <route id="W_to_E" edges="W_in E_out"/>
-    <route id="W_to_N" edges="W_in N_out"/>
-    <route id="W_to_S" edges="W_in S_out"/>
+    <!-- Corridor routes -->
+    <route id="W_to_E_full" edges="W1_in W2_in W3_in W4_in"/>
+    <route id="E_to_W_full" edges="W4_out W3_out W2_out W1_out"/>
 
-    <!-- PHASE 1: NORMAL TRAFFIC t=2-20s -->
-    <vehicle id="car_01" type="normal_car" route="N_to_S" depart="2.0"  departLane="best" departSpeed="10"/>
-    <vehicle id="car_02" type="normal_car" route="S_to_N" depart="3.0"  departLane="best" departSpeed="10"/>
-    <vehicle id="car_03" type="normal_car" route="E_to_W" depart="4.0"  departLane="best" departSpeed="10"/>
-    <vehicle id="car_04" type="normal_car" route="W_to_E" depart="5.0"  departLane="best" departSpeed="10"/>
-    <vehicle id="car_05" type="normal_car" route="N_to_E" depart="6.0"  departLane="best" departSpeed="9"/>
-    <vehicle id="car_06" type="normal_car" route="S_to_W" depart="7.0"  departLane="best" departSpeed="11"/>
-    <vehicle id="car_07" type="normal_car" route="E_to_N" depart="8.0"  departLane="best" departSpeed="10"/>
-    <vehicle id="car_08" type="normal_car" route="W_to_S" depart="9.0"  departLane="best" departSpeed="9"/>
-    <vehicle id="car_09" type="normal_car" route="N_to_W" depart="10.0" departLane="best" departSpeed="10"/>
-    <vehicle id="car_10" type="normal_car" route="S_to_E" depart="11.0" departLane="best" departSpeed="10"/>
-    <vehicle id="car_11" type="normal_car" route="E_to_S" depart="12.0" departLane="best" departSpeed="11"/>
-    <vehicle id="car_12" type="normal_car" route="W_to_N" depart="13.0" departLane="best" departSpeed="9"/>
-    <vehicle id="car_13" type="normal_car" route="N_to_S" depart="15.0" departLane="best" departSpeed="10"/>
-    <vehicle id="car_14" type="normal_car" route="S_to_N" depart="16.0" departLane="best" departSpeed="10"/>
-    <vehicle id="car_15" type="normal_car" route="E_to_W" depart="17.0" departLane="best" departSpeed="12"/>
-    <vehicle id="car_16" type="normal_car" route="W_to_E" depart="18.0" departLane="best" departSpeed="10"/>
-    <vehicle id="car_17" type="normal_car" route="N_to_E" depart="19.0" departLane="best" departSpeed="9"/>
-    <vehicle id="car_18" type="normal_car" route="S_to_W" depart="20.0" departLane="best" departSpeed="10"/>
+    <!-- Turning routes across multiple intersections -->
+    <route id="S_w_to_N_e_turn" edges="Sw_in W2_in W3_in Ne_out"/>
+    <route id="N_e_to_S_w_turn" edges="Ne_in W3_out W2_out Sw_out"/>
+    <route id="N_w_to_E_turn"   edges="Nw_in W2_in W3_in W4_in"/>
+    <route id="E_to_N_w_turn"   edges="W4_out W3_out W2_out Nw_out"/>
+    <route id="S_e_to_W_turn"   edges="Se_in W3_out W2_out W1_out"/>
+    <route id="W_to_S_e_turn"   edges="W1_in W2_in W3_in Se_out"/>
+    <route id="N_c_to_S_c"      edges="Nc_in Sc_out"/>
+    <route id="S_c_to_N_c"      edges="Sc_in Nc_out"/>
 
-    <!-- PHASE 2: BRAKE FAILURE + WRONG-WAY t=25s -->
-    <vehicle id="brake_fail_01" type="brake_fail" route="W_to_E" depart="25.0" departLane="best" departSpeed="16.0"/>
-    <vehicle id="wrong_way_01"  type="wrong_way"  route="E_to_W" depart="25.0" departLane="best" departSpeed="13.0"/>
-    <vehicle id="react_01" type="normal_car" route="W_to_E" depart="26.0" departLane="best" departSpeed="10"/>
-    <vehicle id="react_02" type="normal_car" route="E_to_W" depart="26.0" departLane="best" departSpeed="10"/>
-    <vehicle id="react_03" type="normal_car" route="N_to_S" depart="27.0" departLane="best" departSpeed="10"/>
-    <vehicle id="react_04" type="normal_car" route="S_to_N" depart="27.0" departLane="best" departSpeed="10"/>
+    <!-- PHASE 1 -->
+    <vehicle id="car_01" type="normal_car" route="W_to_E_full"   depart="2.0"  departLane="best" departSpeed="10"/>
+    <vehicle id="car_02" type="normal_car" route="E_to_W_full"   depart="3.0"  departLane="best" departSpeed="10"/>
+    <vehicle id="car_03" type="normal_car" route="N_w_to_E_turn" depart="4.0"  departLane="best" departSpeed="10"/>
+    <vehicle id="car_04" type="normal_car" route="E_to_N_w_turn" depart="5.0"  departLane="best" departSpeed="10"/>
+    <vehicle id="car_05" type="normal_car" route="S_e_to_W_turn" depart="6.0"  departLane="best" departSpeed="10"/>
+    <vehicle id="car_06" type="normal_car" route="W_to_S_e_turn" depart="7.0"  departLane="best" departSpeed="10"/>
+    <vehicle id="car_07" type="normal_car" route="S_w_to_N_e_turn" depart="8.0" departLane="best" departSpeed="9"/>
+    <vehicle id="car_08" type="normal_car" route="N_e_to_S_w_turn" depart="9.0" departLane="best" departSpeed="9"/>
+    <vehicle id="car_09" type="normal_car" route="N_c_to_S_c"    depart="10.0" departLane="best" departSpeed="10"/>
+    <vehicle id="car_10" type="normal_car" route="S_c_to_N_c"    depart="11.0" departLane="best" departSpeed="10"/>
+    <vehicle id="car_11" type="normal_car" route="W_to_E_full"   depart="12.0" departLane="best" departSpeed="11"/>
+    <vehicle id="car_12" type="normal_car" route="E_to_W_full"   depart="13.0" departLane="best" departSpeed="11"/>
 
-    <!-- PHASE 3: PEDESTRIAN t=40s -->
-    <vehicle id="ped_01"  type="normal_car" route="N_to_S" depart="40.0" departLane="best" departSpeed="0.5"/>
-    <vehicle id="car_p1"  type="normal_car" route="N_to_S" depart="40.5" departLane="best" departSpeed="11"/>
-    <vehicle id="car_p2"  type="normal_car" route="N_to_S" depart="41.0" departLane="best" departSpeed="10"/>
+    <!-- PHASE 2 -->
+    <vehicle id="brake_fail_01" type="brake_fail" route="W_to_E_full" depart="25.0" departLane="best" departSpeed="16.0"/>
+    <vehicle id="wrong_way_01"  type="wrong_way"  route="E_to_W_full" depart="25.0" departLane="best" departSpeed="13.0"/>
+    <vehicle id="react_01" type="normal_car" route="N_c_to_S_c" depart="26.0" departLane="best" departSpeed="10"/>
+    <vehicle id="react_02" type="normal_car" route="S_c_to_N_c" depart="26.5" departLane="best" departSpeed="10"/>
+    <vehicle id="react_03" type="normal_car" route="S_e_to_W_turn" depart="27.0" departLane="best" departSpeed="10"/>
 
-    <!-- PHASE 4: EMERGENCY VEHICLES t=54-56s -->
-    <vehicle id="yield_01" type="normal_car" route="N_to_S" depart="54.0" departLane="best" departSpeed="10"/>
-    <vehicle id="yield_02" type="normal_car" route="E_to_W" depart="54.0" departLane="best" departSpeed="10"/>
-    <vehicle id="yield_03" type="normal_car" route="W_to_E" depart="54.0" departLane="best" departSpeed="10"/>
-    <vehicle id="yield_04" type="normal_car" route="S_to_N" depart="54.5" departLane="best" departSpeed="10"/>
-    <vehicle id="ambulance_01" type="ambulance" route="W_to_E" depart="55.0" departLane="best" departSpeed="13.0"/>
-    <vehicle id="yield_05" type="normal_car" route="N_to_E" depart="55.5" departLane="best" departSpeed="9"/>
-    <vehicle id="yield_06" type="normal_car" route="E_to_S" depart="55.5" departLane="best" departSpeed="10"/>
-    <vehicle id="firetruck_01" type="firetruck" route="S_to_N" depart="56.0" departLane="best" departSpeed="12.0"/>
+    <!-- PHASE 3 -->
+    <vehicle id="ped_01"  type="normal_car" route="N_c_to_S_c" depart="40.0" departLane="best" departSpeed="0.5"/>
+    <vehicle id="car_p1"  type="normal_car" route="N_c_to_S_c" depart="40.5" departLane="best" departSpeed="11"/>
+    <vehicle id="car_p2"  type="normal_car" route="S_c_to_N_c" depart="41.0" departLane="best" departSpeed="10"/>
 
+    <!-- PHASE 4: EVs traverse multiple intersections and turn -->
+    <vehicle id="yield_01" type="normal_car" route="W_to_E_full" depart="54.0" departLane="best" departSpeed="10"/>
+    <vehicle id="yield_02" type="normal_car" route="E_to_W_full" depart="54.0" departLane="best" departSpeed="10"/>
+    <vehicle id="yield_03" type="normal_car" route="N_w_to_E_turn" depart="54.2" departLane="best" departSpeed="10"/>
+    <vehicle id="yield_04" type="normal_car" route="S_e_to_W_turn" depart="54.4" departLane="best" departSpeed="10"/>
+    <vehicle id="ambulance_01" type="ambulance" route="S_w_to_N_e_turn" depart="55.0" departLane="best" departSpeed="13.0"/>
+    <vehicle id="firetruck_01" type="firetruck" route="N_e_to_S_w_turn" depart="56.0" departLane="best" departSpeed="12.0"/>
+
+    <!-- Red-light violators (highlighted pink by controller) -->
+    <vehicle id="rlv_01" type="normal_car" route="N_c_to_S_c" depart="55.3" departLane="best" departSpeed="12"/>
+    <vehicle id="rlv_02" type="normal_car" route="E_to_W_full" depart="55.5" departLane="best" departSpeed="12"/>
+    <vehicle id="rlv_03" type="normal_car" route="S_c_to_N_c" depart="56.1" departLane="best" departSpeed="12"/>
 </routes>

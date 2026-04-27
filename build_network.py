@@ -1,4 +1,5 @@
-#!/usr/bin/env python3"""
+#!/usr/bin/env python3
+"""
 Build the SUMO network file from node/edge/connection XML files.
 Run this once: python build_network.py
 Requires SUMO to be installed at C:\Program Files (x86)\Eclipse\Sumo

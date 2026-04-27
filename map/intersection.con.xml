@@ -1,34 +1,89 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <connections>
-    <!-- North inbound -> South/East/West outbound -->
-    <connection from="N_in" to="S_out" fromLane="0" toLane="0"/>
-    <connection from="N_in" to="S_out" fromLane="1" toLane="1"/>
-    <connection from="N_in" to="E_out" fromLane="0" toLane="0"/>
-    <connection from="N_in" to="E_out" fromLane="1" toLane="1"/>
-    <connection from="N_in" to="W_out" fromLane="0" toLane="0"/>
-    <connection from="N_in" to="W_out" fromLane="1" toLane="1"/>
+    <!-- j_w incoming: W1_in, W2_out, Nw_in, Sw_in -->
+    <connection from="W1_in"  to="W2_in"  fromLane="0" toLane="0"/>
+    <connection from="W1_in"  to="W2_in"  fromLane="1" toLane="1"/>
+    <connection from="W1_in"  to="Nw_out" fromLane="0" toLane="0"/>
+    <connection from="W1_in"  to="Nw_out" fromLane="1" toLane="1"/>
+    <connection from="W1_in"  to="Sw_out" fromLane="0" toLane="0"/>
+    <connection from="W1_in"  to="Sw_out" fromLane="1" toLane="1"/>
 
-    <!-- South inbound -> North/East/West outbound -->
-    <connection from="S_in" to="N_out" fromLane="0" toLane="0"/>
-    <connection from="S_in" to="N_out" fromLane="1" toLane="1"/>
-    <connection from="S_in" to="E_out" fromLane="0" toLane="0"/>
-    <connection from="S_in" to="E_out" fromLane="1" toLane="1"/>
-    <connection from="S_in" to="W_out" fromLane="0" toLane="0"/>
-    <connection from="S_in" to="W_out" fromLane="1" toLane="1"/>
+    <connection from="W2_out" to="W1_out" fromLane="0" toLane="0"/>
+    <connection from="W2_out" to="W1_out" fromLane="1" toLane="1"/>
+    <connection from="W2_out" to="Nw_out" fromLane="0" toLane="0"/>
+    <connection from="W2_out" to="Nw_out" fromLane="1" toLane="1"/>
+    <connection from="W2_out" to="Sw_out" fromLane="0" toLane="0"/>
+    <connection from="W2_out" to="Sw_out" fromLane="1" toLane="1"/>
 
-    <!-- East inbound -> North/South/West outbound -->
-    <connection from="E_in" to="N_out" fromLane="0" toLane="0"/>
-    <connection from="E_in" to="N_out" fromLane="1" toLane="1"/>
-    <connection from="E_in" to="S_out" fromLane="0" toLane="0"/>
-    <connection from="E_in" to="S_out" fromLane="1" toLane="1"/>
-    <connection from="E_in" to="W_out" fromLane="0" toLane="0"/>
-    <connection from="E_in" to="W_out" fromLane="1" toLane="1"/>
+    <connection from="Nw_in"  to="Sw_out" fromLane="0" toLane="0"/>
+    <connection from="Nw_in"  to="Sw_out" fromLane="1" toLane="1"/>
+    <connection from="Nw_in"  to="W2_in"  fromLane="0" toLane="0"/>
+    <connection from="Nw_in"  to="W2_in"  fromLane="1" toLane="1"/>
+    <connection from="Nw_in"  to="W1_out" fromLane="0" toLane="0"/>
+    <connection from="Nw_in"  to="W1_out" fromLane="1" toLane="1"/>
 
-    <!-- West inbound -> North/South/East outbound -->
-    <connection from="W_in" to="N_out" fromLane="0" toLane="0"/>
-    <connection from="W_in" to="N_out" fromLane="1" toLane="1"/>
-    <connection from="W_in" to="S_out" fromLane="0" toLane="0"/>
-    <connection from="W_in" to="S_out" fromLane="1" toLane="1"/>
-    <connection from="W_in" to="E_out" fromLane="0" toLane="0"/>
-    <connection from="W_in" to="E_out" fromLane="1" toLane="1"/>
+    <connection from="Sw_in"  to="Nw_out" fromLane="0" toLane="0"/>
+    <connection from="Sw_in"  to="Nw_out" fromLane="1" toLane="1"/>
+    <connection from="Sw_in"  to="W2_in"  fromLane="0" toLane="0"/>
+    <connection from="Sw_in"  to="W2_in"  fromLane="1" toLane="1"/>
+    <connection from="Sw_in"  to="W1_out" fromLane="0" toLane="0"/>
+    <connection from="Sw_in"  to="W1_out" fromLane="1" toLane="1"/>
+
+    <!-- j_c incoming: W2_in, W3_out, Nc_in, Sc_in -->
+    <connection from="W2_in"  to="W3_in"  fromLane="0" toLane="0"/>
+    <connection from="W2_in"  to="W3_in"  fromLane="1" toLane="1"/>
+    <connection from="W2_in"  to="Nc_out" fromLane="0" toLane="0"/>
+    <connection from="W2_in"  to="Nc_out" fromLane="1" toLane="1"/>
+    <connection from="W2_in"  to="Sc_out" fromLane="0" toLane="0"/>
+    <connection from="W2_in"  to="Sc_out" fromLane="1" toLane="1"/>
+
+    <connection from="W3_out" to="W2_out" fromLane="0" toLane="0"/>
+    <connection from="W3_out" to="W2_out" fromLane="1" toLane="1"/>
+    <connection from="W3_out" to="Nc_out" fromLane="0" toLane="0"/>
+    <connection from="W3_out" to="Nc_out" fromLane="1" toLane="1"/>
+    <connection from="W3_out" to="Sc_out" fromLane="0" toLane="0"/>
+    <connection from="W3_out" to="Sc_out" fromLane="1" toLane="1"/>
+
+    <connection from="Nc_in"  to="Sc_out" fromLane="0" toLane="0"/>
+    <connection from="Nc_in"  to="Sc_out" fromLane="1" toLane="1"/>
+    <connection from="Nc_in"  to="W3_in"  fromLane="0" toLane="0"/>
+    <connection from="Nc_in"  to="W3_in"  fromLane="1" toLane="1"/>
+    <connection from="Nc_in"  to="W2_out" fromLane="0" toLane="0"/>
+    <connection from="Nc_in"  to="W2_out" fromLane="1" toLane="1"/>
+
+    <connection from="Sc_in"  to="Nc_out" fromLane="0" toLane="0"/>
+    <connection from="Sc_in"  to="Nc_out" fromLane="1" toLane="1"/>
+    <connection from="Sc_in"  to="W3_in"  fromLane="0" toLane="0"/>
+    <connection from="Sc_in"  to="W3_in"  fromLane="1" toLane="1"/>
+    <connection from="Sc_in"  to="W2_out" fromLane="0" toLane="0"/>
+    <connection from="Sc_in"  to="W2_out" fromLane="1" toLane="1"/>
+
+    <!-- j_e incoming: W3_in, W4_out, Ne_in, Se_in -->
+    <connection from="W3_in"  to="W4_in"  fromLane="0" toLane="0"/>
+    <connection from="W3_in"  to="W4_in"  fromLane="1" toLane="1"/>
+    <connection from="W3_in"  to="Ne_out" fromLane="0" toLane="0"/>
+    <connection from="W3_in"  to="Ne_out" fromLane="1" toLane="1"/>
+    <connection from="W3_in"  to="Se_out" fromLane="0" toLane="0"/>
+    <connection from="W3_in"  to="Se_out" fromLane="1" toLane="1"/>
+
+    <connection from="W4_out" to="W3_out" fromLane="0" toLane="0"/>
+    <connection from="W4_out" to="W3_out" fromLane="1" toLane="1"/>
+    <connection from="W4_out" to="Ne_out" fromLane="0" toLane="0"/>
+    <connection from="W4_out" to="Ne_out" fromLane="1" toLane="1"/>
+    <connection from="W4_out" to="Se_out" fromLane="0" toLane="0"/>
+    <connection from="W4_out" to="Se_out" fromLane="1" toLane="1"/>
+
+    <connection from="Ne_in"  to="Se_out" fromLane="0" toLane="0"/>
+    <connection from="Ne_in"  to="Se_out" fromLane="1" toLane="1"/>
+    <connection from="Ne_in"  to="W4_in"  fromLane="0" toLane="0"/>
+    <connection from="Ne_in"  to="W4_in"  fromLane="1" toLane="1"/>
+    <connection from="Ne_in"  to="W3_out" fromLane="0" toLane="0"/>
+    <connection from="Ne_in"  to="W3_out" fromLane="1" toLane="1"/>
+
+    <connection from="Se_in"  to="Ne_out" fromLane="0" toLane="0"/>
+    <connection from="Se_in"  to="Ne_out" fromLane="1" toLane="1"/>
+    <connection from="Se_in"  to="W4_in"  fromLane="0" toLane="0"/>
+    <connection from="Se_in"  to="W4_in"  fromLane="1" toLane="1"/>
+    <connection from="Se_in"  to="W3_out" fromLane="0" toLane="0"/>
+    <connection from="Se_in"  to="W3_out" fromLane="1" toLane="1"/>
 </connections>

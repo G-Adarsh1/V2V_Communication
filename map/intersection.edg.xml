@@ -2,20 +2,38 @@
 <edges xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
        xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/edges_file.xsd">
 
-    <!-- North <-> Center -->
-    <edge id="N_in"  from="north"  to="center" numLanes="2" speed="13.89" spreadType="center"/>
-    <edge id="N_out" from="center" to="north"  numLanes="2" speed="13.89" spreadType="center"/>
+    <!-- West boundary <-> west junction -->
+    <edge id="W1_in"  from="west_end" to="j_w" numLanes="2" speed="13.89" spreadType="center"/>
+    <edge id="W1_out" from="j_w" to="west_end" numLanes="2" speed="13.89" spreadType="center"/>
 
-    <!-- South <-> Center -->
-    <edge id="S_in"  from="south"  to="center" numLanes="2" speed="13.89" spreadType="center"/>
-    <edge id="S_out" from="center" to="south"  numLanes="2" speed="13.89" spreadType="center"/>
+    <!-- West junction <-> center junction -->
+    <edge id="W2_in"  from="j_w" to="j_c" numLanes="2" speed="13.89" spreadType="center"/>
+    <edge id="W2_out" from="j_c" to="j_w" numLanes="2" speed="13.89" spreadType="center"/>
 
-    <!-- East <-> Center -->
-    <edge id="E_in"  from="east"   to="center" numLanes="2" speed="13.89" spreadType="center"/>
-    <edge id="E_out" from="center" to="east"   numLanes="2" speed="13.89" spreadType="center"/>
+    <!-- Center junction <-> east junction -->
+    <edge id="W3_in"  from="j_c" to="j_e" numLanes="2" speed="13.89" spreadType="center"/>
+    <edge id="W3_out" from="j_e" to="j_c" numLanes="2" speed="13.89" spreadType="center"/>
 
-    <!-- West <-> Center -->
-    <edge id="W_in"  from="west"   to="center" numLanes="2" speed="13.89" spreadType="center"/>
-    <edge id="W_out" from="center" to="west"   numLanes="2" speed="13.89" spreadType="center"/>
+    <!-- East junction <-> east boundary -->
+    <edge id="W4_in"  from="j_e" to="east_end" numLanes="2" speed="13.89" spreadType="center"/>
+    <edge id="W4_out" from="east_end" to="j_e" numLanes="2" speed="13.89" spreadType="center"/>
+
+    <!-- North/south arms at west junction -->
+    <edge id="Nw_in"  from="north_w" to="j_w" numLanes="2" speed="13.89" spreadType="center"/>
+    <edge id="Nw_out" from="j_w" to="north_w" numLanes="2" speed="13.89" spreadType="center"/>
+    <edge id="Sw_in"  from="south_w" to="j_w" numLanes="2" speed="13.89" spreadType="center"/>
+    <edge id="Sw_out" from="j_w" to="south_w" numLanes="2" speed="13.89" spreadType="center"/>
+
+    <!-- North/south arms at center junction -->
+    <edge id="Nc_in"  from="north_c" to="j_c" numLanes="2" speed="13.89" spreadType="center"/>
+    <edge id="Nc_out" from="j_c" to="north_c" numLanes="2" speed="13.89" spreadType="center"/>
+    <edge id="Sc_in"  from="south_c" to="j_c" numLanes="2" speed="13.89" spreadType="center"/>
+    <edge id="Sc_out" from="j_c" to="south_c" numLanes="2" speed="13.89" spreadType="center"/>
+
+    <!-- North/south arms at east junction -->
+    <edge id="Ne_in"  from="north_e" to="j_e" numLanes="2" speed="13.89" spreadType="center"/>
+    <edge id="Ne_out" from="j_e" to="north_e" numLanes="2" speed="13.89" spreadType="center"/>
+    <edge id="Se_in"  from="south_e" to="j_e" numLanes="2" speed="13.89" spreadType="center"/>
+    <edge id="Se_out" from="j_e" to="south_e" numLanes="2" speed="13.89" spreadType="center"/>
 
 </edges>

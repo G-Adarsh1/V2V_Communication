@@ -22,6 +22,9 @@ ROOT     = os.path.dirname(os.path.abspath(__file__))
 SRC_DIR  = os.path.join(ROOT, 'src')
 MAP_DIR  = os.path.join(ROOT, 'map')
 NET_FILE = os.path.join(MAP_DIR, 'intersection.net.xml')
+NODE_FILE = os.path.join(MAP_DIR, "intersection.nod.xml")
+EDGE_FILE = os.path.join(MAP_DIR, "intersection.edg.xml")
+CON_FILE  = os.path.join(MAP_DIR, "intersection.con.xml")
 SUMO_HOME= r"C:\Program Files (x86)\Eclipse\Sumo"
 NETCONV  = os.path.join(SUMO_HOME, 'bin', 'netconvert.exe')
 
@@ -51,6 +54,19 @@ def build_network():
         sys.exit(1)
     print("[Setup] Network built → intersection.net.xml ✓")
 
+
+def needs_rebuild():
+    if not os.path.exists(NET_FILE):
+        return True
+    try:
+        net_mtime = os.path.getmtime(NET_FILE)
+        src_latest = max(os.path.getmtime(NODE_FILE),
+                         os.path.getmtime(EDGE_FILE),
+                         os.path.getmtime(CON_FILE))
+        return src_latest > net_mtime
+    except OSError:
+        return True
+
 def check_dependencies():
     missing = []
     for pkg in ['numpy','sklearn','matplotlib']:
@@ -79,7 +95,7 @@ def main():
     check_dependencies()
 
     # Build network if missing or requested
-    if not os.path.exists(NET_FILE) or args.build:
+    if args.build or needs_rebuild():
         build_network()
     else:
         print(f"[Setup] Network file found ✓")

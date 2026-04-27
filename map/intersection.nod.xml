@@ -2,13 +2,23 @@
 <nodes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
        xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/nodes_file.xsd">
 
-    <!-- Central intersection with traffic light -->
-    <node id="center" x="0"    y="0"    type="traffic_light"/>
+    <!-- Three signalized intersections on an east-west corridor -->
+    <node id="j_w" x="-300" y="0" type="traffic_light"/>
+    <node id="j_c" x="0"    y="0" type="traffic_light"/>
+    <node id="j_e" x="300"  y="0" type="traffic_light"/>
 
-    <!-- 4 arm endpoints -->
-    <node id="north"  x="0"    y="300"  type="dead_end"/>
-    <node id="south"  x="0"    y="-300" type="dead_end"/>
-    <node id="east"   x="300"  y="0"    type="dead_end"/>
-    <node id="west"   x="-300" y="0"    type="dead_end"/>
+    <!-- Corridor boundary endpoints -->
+    <node id="west_end" x="-600" y="0" type="dead_end"/>
+    <node id="east_end" x="600"  y="0" type="dead_end"/>
+
+    <!-- North/south endpoints for each junction -->
+    <node id="north_w" x="-300" y="300" type="dead_end"/>
+    <node id="south_w" x="-300" y="-300" type="dead_end"/>
+
+    <node id="north_c" x="0" y="300" type="dead_end"/>
+    <node id="south_c" x="0" y="-300" type="dead_end"/>
+
+    <node id="north_e" x="300" y="300" type="dead_end"/>
+    <node id="south_e" x="300" y="-300" type="dead_end"/>
 
 </nodes>
