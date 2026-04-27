@@ -58,6 +58,7 @@ COL_BRAKE     = (255,   0,   0, 255)
 COL_WRONG     = (255, 100,   0, 255)
 COL_AMBULANCE = (255, 100, 180, 255)
 COL_FIRETRUCK = (220,  30,  30, 255)
+COL_RESCUE    = (120, 200, 255, 255)
 COL_PULLOVER  = (  0, 180, 255, 255)   # blue  = pulling over (still moving)
 COL_WAITING   = (255, 220,   0, 255)   # yellow = stopped at crossing
 
@@ -83,6 +84,9 @@ CRAWL_SPEED_MPS      = 3.0     # same-axis vehicles slow to this
 EV_GAP_THROTTLE_HARD = 8.0     # EV slows hard if gap < this (m)
 EV_GAP_THROTTLE_SOFT = 25.0    # EV slows gently if gap < this (m)
 LANE_LOCK_COOLDOWN   = 30      # steps between lane-change commands per vehicle
+LANE_TRACE_DEPTH     = 10      # lane-level look-ahead hops for strict corridor
+LANE_RETRY_STEPS     = 8       # retry lane-change if vehicle failed to move aside
+FORCE_CLEAR_GAP_M    = 32.0    # inside this gap, blocker gets stronger clear command
 
 # ── TL preemption phases ──────────────────────────────────────
 # Ambulance travels W→E (horizontal) → needs E/W green
@@ -129,6 +133,20 @@ def _same_direction(vid, emg_id):
         return False
 
 
+def _motion_axis(vid):
+    """
+    Determine travel axis from heading (robust across arbitrary edge names).
+    Returns 'h' (east/west), 'v' (north/south), or ''.
+    """
+    try:
+        ea = traci.vehicle.getAngle(vid)          # SUMO: 0=N, 90=E
+        hdg = math.radians((90 - ea) % 360)
+        fx, fy = math.cos(hdg), math.sin(hdg)
+        return 'h' if abs(fx) >= abs(fy) else 'v'
+    except:
+        return ''
+
+
 def _in_ev_path(vid, emg_id):
     """
     Path-based relevance check.
@@ -161,10 +179,12 @@ def _in_ev_path(vid, emg_id):
         emg_edge = _get_edge(emg_id)
         vid_edge = _get_edge(vid)
 
-        emg_horiz  = emg_edge in HORIZONTAL_EDGES
-        emg_vert   = emg_edge in VERTICAL_EDGES
-        vid_horiz  = vid_edge in HORIZONTAL_EDGES
-        vid_vert   = vid_edge in VERTICAL_EDGES
+        emg_axis   = _motion_axis(emg_id)
+        vid_axis   = _motion_axis(vid)
+        emg_horiz  = emg_axis == 'h'
+        emg_vert   = emg_axis == 'v'
+        vid_horiz  = vid_axis == 'h'
+        vid_vert   = vid_axis == 'v'
         emg_in_jct = emg_edge.startswith(':')
 
         # ── EV inside junction box — pure geometry ───────────────
@@ -221,6 +241,40 @@ def _is_ahead_of_ev(vid, emg_id):
         return False
 
 
+def _lane_edge(lane_id):
+    """Best-effort edge id extraction from lane id."""
+    if not lane_id:
+        return ''
+    if '_' in lane_id:
+        return lane_id.rsplit('_', 1)[0]
+    return lane_id
+
+
+def _lane_link_targets(lane_id):
+    """
+    Return [(to_lane_id, via_lane_id)] for a lane.
+    Handles different SUMO link tuple layouts defensively.
+    """
+    out = []
+    try:
+        links = traci.lane.getLinks(lane_id)
+    except:
+        return out
+
+    for lk in links:
+        if not lk:
+            continue
+        to_lane = lk[0] if len(lk) > 0 and isinstance(lk[0], str) else ''
+        via_lane = ''
+        for item in lk[1:]:
+            if isinstance(item, str) and item.startswith(':'):
+                via_lane = item
+                break
+        if to_lane:
+            out.append((to_lane, via_lane))
+    return out
+
+
 # ═══════════════════════════════════════════════════════════════
 class V2VController:
     def __init__(self, no_v2v_mode=False):
@@ -243,13 +297,14 @@ class V2VController:
         self.AMBULANCE         = 'ambulance_01'
         self.FIRETRUCK         = 'firetruck_01'
         self.PED               = 'ped_01'
-        self.EMG_VEHICLES      = {self.AMBULANCE, self.FIRETRUCK}
+        self.EMG_TYPES         = {'ambulance', 'firetruck', 'rescue_ev'}
         self.INCIDENT_VEHICLES = {self.BRAKE_FAIL, self.WRONG_WAY,
-                                   self.AMBULANCE, self.FIRETRUCK, self.PED}
+                                   self.PED}
 
         # ── Emergency corridor state ──────────────────────────
         self.emg_active       = False
         self.emg_entry_t      = 0.0
+        self.intersection_id  = 'center'
         self.intersection_ctr = (300.0, 300.0)
 
         # FIX A: split tl_overridden into phase-lock tracking
@@ -300,7 +355,17 @@ class V2VController:
         self.tl_ids = list(traci.trafficlight.getIDList())
 
         try:
-            self.intersection_ctr = traci.junction.getPosition('center')
+            jids = list(traci.junction.getIDList())
+            if self.intersection_id in jids:
+                self.intersection_ctr = traci.junction.getPosition(self.intersection_id)
+            elif jids:
+                # Fallback: choose the junction nearest to the map center.
+                self.intersection_id = min(
+                    jids,
+                    key=lambda jid: (
+                        (traci.junction.getPosition(jid)[0] - 300.0) ** 2 +
+                        (traci.junction.getPosition(jid)[1] - 300.0) ** 2))
+                self.intersection_ctr = traci.junction.getPosition(self.intersection_id)
         except:
             self.intersection_ctr = (300.0, 300.0)
 
@@ -348,15 +413,17 @@ class V2VController:
             for v in cur - self.active_vids:
                 self.net.register(v)
                 self.risk_state[v] = 'SAFE'
+            prev_emg_ids = set(self._get_active_emergency_ids(self.active_vids))
+            cur_emg_ids  = set(self._get_active_emergency_ids(cur))
             for v in self.active_vids - cur:
                 self.net.remove(v)
                 self.risk_state.pop(v, None)
-                if v in self.EMG_VEHICLES and self.emg_active:
+                if v in prev_emg_ids and self.emg_active:
                     self._on_ev_exited(v, cur)
             self.active_vids = cur
 
             # Exit condition: past 120s AND no EVs alive AND corridor closed
-            emg_still_alive = any(v in cur for v in self.EMG_VEHICLES)
+            emg_still_alive = bool(cur_emg_ids)
             if self.sim_t >= 120.0 and not emg_still_alive and not self.emg_active:
                 break
 
@@ -370,7 +437,12 @@ class V2VController:
                     spd  = traci.vehicle.getSpeed(vid)
                     acc  = traci.vehicle.getAcceleration(vid)
                     ang  = traci.vehicle.getAngle(vid)
-                    self.net.update_state(vid, x, y, spd, acc, (90 - ang) % 360)
+                    vtype = traci.vehicle.getTypeID(vid)
+                    is_emergency = vtype in self.EMG_TYPES
+                    self.net.update_state(
+                        vid, x, y, spd, acc, (90 - ang) % 360,
+                        is_emergency=is_emergency,
+                        emergency_role=vtype if is_emergency else '')
                 except:
                     pass
 
@@ -417,6 +489,96 @@ class V2VController:
                     self.last_hop = e['hop']
 
     # ═══════════════════════════════════════════════════════════
+    def _get_active_emergency_ids(self, vids):
+        emg = []
+        for vid in vids:
+            try:
+                if traci.vehicle.getTypeID(vid) in self.EMG_TYPES:
+                    emg.append(vid)
+            except:
+                pass
+        return emg
+
+    def _lane_path_for_ev(self, emg_id, hop_limit=LANE_TRACE_DEPTH):
+        """
+        Strict lane corridor path via lane-level link tracing:
+        current lane -> selected outgoing link lane -> next, following route edges.
+        """
+        lanes = set()
+        edges = set()
+        try:
+            route = traci.vehicle.getRoute(emg_id)
+            route_idx = traci.vehicle.getRouteIndex(emg_id)
+            cur_lane = traci.vehicle.getLaneID(emg_id)
+            if not cur_lane:
+                return lanes, edges
+
+            lanes.add(cur_lane)
+            edges.add(_lane_edge(cur_lane))
+            if route_idx < 0:
+                route_idx = 0
+            edge_pos = route_idx
+
+            lane = cur_lane
+            hops = 0
+            while hops < hop_limit:
+                links = _lane_link_targets(lane)
+                if not links:
+                    break
+
+                target_edge = route[edge_pos + 1] if edge_pos + 1 < len(route) else None
+                chosen = None
+                if target_edge:
+                    for to_lane, via_lane in links:
+                        if _lane_edge(to_lane) == target_edge:
+                            chosen = (to_lane, via_lane)
+                            break
+                if chosen is None:
+                    chosen = links[0]
+
+                to_lane, via_lane = chosen
+                if via_lane:
+                    lanes.add(via_lane)
+                    edges.add(_lane_edge(via_lane))
+                lanes.add(to_lane)
+                edges.add(_lane_edge(to_lane))
+
+                if target_edge and _lane_edge(to_lane) == target_edge:
+                    edge_pos += 1
+                lane = to_lane
+                hops += 1
+        except:
+            pass
+        return lanes, edges
+
+    def _route_overlaps_corridor(self, vid, corridor_edges):
+        """
+        Extra strictness: only command vehicles whose near-future route
+        overlaps the EV traced corridor edges.
+        """
+        if not corridor_edges:
+            return True
+        try:
+            edge_now = traci.vehicle.getRoadID(vid)
+            if edge_now in corridor_edges:
+                return True
+            route = traci.vehicle.getRoute(vid)
+            idx = traci.vehicle.getRouteIndex(vid)
+            if idx < 0:
+                idx = 0
+            look = route[idx:idx + 4]
+            return any(e in corridor_edges for e in look)
+        except:
+            return False
+
+    def _veh_known(self, vid):
+        try:
+            traci.vehicle.getRoadID(vid)
+            return True
+        except:
+            return False
+
+    # ═══════════════════════════════════════════════════════════
     # FIX A: EARLY SIGNAL PREEMPTION — re-evaluated EVERY step
     #
     # Key change from original:
@@ -428,7 +590,7 @@ class V2VController:
     #        is per-phase, not a one-time flag.
     # ═══════════════════════════════════════════════════════════
     def _preempt_signals_early(self, cur):
-        emg_present = [v for v in self.EMG_VEHICLES if v in cur]
+        emg_present = self._get_active_emergency_ids(cur)
         if not emg_present:
             return
 
@@ -445,9 +607,9 @@ class V2VController:
                 eta    = dist / spd
                 if eta < best_eta:
                     best_eta = eta
-                    edge = _get_edge(emg_id)
+                    axis = _motion_axis(emg_id)
                     winner_phase = (VERTICAL_GREEN_PHASE
-                                   if edge in VERTICAL_EDGES
+                                   if axis == 'v'
                                    else HORIZONTAL_GREEN_PHASE)
             except:
                 pass
@@ -569,6 +731,8 @@ class V2VController:
                 try:
                     cx, cy = traci.vehicle.getPosition(cid)
                     if math.sqrt((cx - px) ** 2 + (cy - py) ** 2) < 40.0:
+                        if not self._veh_known(cid):
+                            continue
                         traci.vehicle.setSpeed(cid, 0.0)
                         self.risk_state[cid] = 'RISK'
                         if self.dash and self.step_n % 50 == 0:
@@ -583,7 +747,7 @@ class V2VController:
     #            + intersection clearance each step
     # ═══════════════════════════════════════════════════════════
     def _emergency_corridor(self, cur):
-        emg_present = [v for v in self.EMG_VEHICLES if v in cur]
+        emg_present = self._get_active_emergency_ids(cur)
         if not emg_present:
             return
 
@@ -596,13 +760,12 @@ class V2VController:
             if self.dash:
                 self.dash.log("", 'INFO')
                 self.dash.log("═══ EMERGENCY CORRIDOR ACTIVE ═══", 'EMERGENCY')
-                self.dash.log(f"Ambulance : {self.AMBULANCE}", 'EMERGENCY')
-                self.dash.log(f"Fire Truck: {self.FIRETRUCK}", 'EMERGENCY')
+                self.dash.log(f"EV count: {len(emg_present)} active", 'EMERGENCY')
                 self.dash.log("", 'INFO')
                 self.dash.set_emergency_priority(True)
                 self.dash.update_impact(
                     len(self.saved_vids), self.prevented,
-                    emg_vehicles=f"{self.AMBULANCE}, {self.FIRETRUCK}")
+                    emg_vehicles=", ".join(sorted(emg_present)))
 
         # Pick priority EV (closest to junction by ETA)
         winner_id = self._pick_winner(emg_present)
@@ -627,13 +790,15 @@ class V2VController:
         for emg_id in emg_present:
             try:
                 ex, ey = traci.vehicle.getPosition(emg_id)
-                emg_info[emg_id] = (ex, ey)
+                corridor_lanes, corridor_edges = self._lane_path_for_ev(emg_id)
+                emg_info[emg_id] = (ex, ey, corridor_lanes, corridor_edges)
             except:
                 pass
 
         # ── Normal vehicle handling — PATH-BASED, not radius-based ───
+        emg_ids = set(emg_present)
         for vid in cur:
-            if vid in self.EMG_VEHICLES:
+            if vid in emg_ids:
                 continue
             if vid in self._junction_clearing:
                 continue
@@ -647,7 +812,21 @@ class V2VController:
             best_role  = None
             nearest_id = None
             best_along = 0.0
-            for emg_id, (ex, ey) in emg_info.items():
+            vid_lane = ''
+            vid_edge = ''
+            try:
+                vid_lane = traci.vehicle.getLaneID(vid)
+                vid_edge = traci.vehicle.getRoadID(vid)
+            except:
+                pass
+
+            for emg_id, (ex, ey, corridor_lanes, corridor_edges) in emg_info.items():
+                if corridor_lanes and vid_lane and not (
+                    vid_lane in corridor_lanes or vid_edge in corridor_edges
+                ):
+                    continue
+                if not self._route_overlaps_corridor(vid, corridor_edges):
+                    continue
                 role, along, lateral = _in_ev_path(vid, emg_id)
                 if role is not None:
                     if best_role is None or role == 'ahead':
@@ -683,11 +862,11 @@ class V2VController:
             if best_role == 'ahead':
                 try:
                     traci.vehicle.setSpeedMode(vid, 31)
+                    traci.vehicle.setLaneChangeMode(vid, 0)
 
                     # Issue lane change immediately — BEFORE slowing.
                     # Vehicle moves to road edge while it still has speed to do so.
-                    if vid not in self._lane_assigned:
-                        self._make_space_either_lane(vid, nearest_id)
+                    self._make_space_either_lane(vid, nearest_id)
 
                     # Progressive speed: far vehicles slow gently, close ones crawl.
                     # This gives vehicles time to complete their lane change while
@@ -699,6 +878,19 @@ class V2VController:
                         target_spd = 5.0    # medium — moderate slow
                     else:
                         target_spd = CRAWL_SPEED_MPS  # close — crawl
+
+                    # If still close and still on the EV lane, force a stronger clear.
+                    if nearest_id is not None and best_along < FORCE_CLEAR_GAP_M:
+                        try:
+                            if traci.vehicle.getLaneID(vid) == traci.vehicle.getLaneID(nearest_id):
+                                # Hard blocker directly in EV lane near junction:
+                                # push it forward out of the EV nose instead of
+                                # letting it sit and trap the EV behind it.
+                                traci.vehicle.setSpeedMode(vid, 7)
+                                target_spd = max(target_spd, 8.0)
+                                self._make_space_either_lane(vid, nearest_id)
+                        except:
+                            pass
 
                     if cur_spd > target_spd:
                         traci.vehicle.setSpeed(vid, target_spd)
@@ -717,8 +909,8 @@ class V2VController:
             elif best_role == 'behind':
                 try:
                     # Issue lane change first (works at any speed via changeLane)
-                    if vid not in self._lane_assigned:
-                        self._make_space_either_lane(vid, nearest_id)
+                    traci.vehicle.setLaneChangeMode(vid, 0)
+                    self._make_space_either_lane(vid, nearest_id)
 
                     # Give a very brief crawl window ONLY while lane change is
                     # pending (first 3 steps after assignment). After that: full stop.
@@ -773,8 +965,9 @@ class V2VController:
     #     The corridor loop now skips vehicles already in _junction_clearing.
     # ═══════════════════════════════════════════════════════════
     def _clear_intersection(self, winner_id, cur):
+        emg_ids = set(self._get_active_emergency_ids(cur))
         for vid in cur:
-            if vid in self.EMG_VEHICLES:
+            if vid in emg_ids:
                 continue
             try:
                 edge = traci.vehicle.getRoadID(vid)
@@ -784,6 +977,8 @@ class V2VController:
             if edge.startswith(':'):
                 # Vehicle is physically inside the junction box — push it out
                 try:
+                    if not self._veh_known(vid):
+                        continue
                     traci.vehicle.setSpeedMode(vid, 7)
                     traci.vehicle.setSpeed(vid, 8.0)
                     self._junction_clearing.add(vid)
@@ -817,10 +1012,12 @@ class V2VController:
         Uses changeLane() directly (not couldChangeLane) so it works at any speed.
         Locked once via _lane_assigned — never changed again.
         """
-        if vid in self._lane_assigned:
-            return
-
         try:
+            if emg_id is None:
+                return
+            if not self._veh_known(vid) or not self._veh_known(emg_id):
+                return
+
             vx, vy = traci.vehicle.getPosition(vid)
             ex, ey = traci.vehicle.getPosition(emg_id)
 
@@ -836,6 +1033,14 @@ class V2VController:
                 self._lane_assigned[vid] = lane_i
                 return
 
+            # Already assigned and currently on assigned lane? nothing to do.
+            assigned = self._lane_assigned.get(vid)
+            if assigned is not None and lane_i == assigned:
+                return
+            # avoid hammering lane change every step
+            if (self.step_n - self._lane_locked.get(vid, -9999)) < LANE_RETRY_STEPS:
+                return
+
             # Signed lateral: which side of EV path centreline is the vehicle on?
             fx, fy = _ev_heading_vec(emg_id)
             px, py = -fy, fx   # perpendicular (points LEFT of EV heading)
@@ -845,19 +1050,29 @@ class V2VController:
             # positive signed_lateral → vehicle is to the LEFT of EV heading
             # negative signed_lateral → vehicle is to the RIGHT of EV heading
 
+            # Prefer a lane different from EV's lane first.
+            try:
+                ev_lane_i = traci.vehicle.getLaneIndex(emg_id)
+            except:
+                ev_lane_i = lane_i
+
             # In SUMO: lane 0 = rightmost, lane (n-1) = leftmost
-            if signed_lateral > 0:
-                # Vehicle is LEFT of EV → push to leftmost lane (n-1)
+            if ev_lane_i == 0:
                 target = lane_n - 1
-            else:
-                # Vehicle is RIGHT of EV → push to rightmost lane (0)
+            elif ev_lane_i == lane_n - 1:
                 target = 0
+            else:
+                target = lane_n - 1 if signed_lateral > 0 else 0
+
+            if target == ev_lane_i:
+                target = 0 if ev_lane_i != 0 else lane_n - 1
 
             if target == lane_i:
                 # Already on the correct edge lane — lock in place
                 self._lane_assigned[vid] = lane_i
                 return
 
+            traci.vehicle.setLaneChangeMode(vid, 0)
             traci.vehicle.changeLane(vid, target, 15.0)
             self._lane_assigned[vid] = target
             self._lane_locked[vid]   = self.step_n
@@ -871,7 +1086,7 @@ class V2VController:
 
     # ═══════════════════════════════════════════════════════════
     def _on_ev_exited(self, exited_vid, cur):
-        remaining_evs = [v for v in self.EMG_VEHICLES if v in cur]
+        remaining_evs = self._get_active_emergency_ids(cur)
         t_clear = self.sim_t - self.emg_entry_t
         self._log(f"{exited_vid} reached destination in {t_clear:.1f}s")
 
@@ -955,9 +1170,10 @@ class V2VController:
         except:
             return 13.5
 
+        emg_ids = set(self._get_active_emergency_ids(cur))
         min_gap = float('inf')
         for vid in cur:
-            if vid == emg_id or vid in self.EMG_VEHICLES:
+            if vid == emg_id or vid in emg_ids:
                 continue
             if vid in self._junction_clearing:
                 continue
@@ -978,14 +1194,20 @@ class V2VController:
             except:
                 pass
 
-        # Smooth speed tiers — no hard binary jumps
+        ev_max = 18.0
+        try:
+            ev_max = max(16.0, traci.vehicle.getMaxSpeed(emg_id))
+        except:
+            pass
+
+        # Smooth speed tiers — higher top-end when road is clear
         if min_gap < EV_GAP_THROTTLE_HARD:
             return 2.0    # imminent — near-stop
         if min_gap < EV_GAP_THROTTLE_SOFT:
             return 6.0    # close — cautious approach
         if min_gap < 60.0:
             return 10.0   # moderate gap — accelerating through
-        return 13.5        # open road — full emergency speed
+        return min(ev_max, 20.0)   # open road — full emergency speed
 
     # ═══════════════════════════════════════════════════════════
     def _speed_zone(self, cur):
@@ -1039,6 +1261,12 @@ class V2VController:
                         (255, 200, 0, 255)
                         if self.emg_active and (self.step_n // 5) % 2 == 0
                         else COL_FIRETRUCK)
+                    continue
+                if vtype == 'rescue_ev':
+                    traci.vehicle.setColor(vid,
+                        (255, 255, 180, 255)
+                        if self.emg_active and (self.step_n // 5) % 2 == 0
+                        else COL_RESCUE)
                     continue
 
                 if vid == self.BRAKE_FAIL:

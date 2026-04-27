@@ -27,6 +27,12 @@
            vClass="emergency" guiShape="truck"
            color="0.9,0.1,0.1"/>
 
+    <vType id="rescue_ev"
+           accel="3.0" decel="5.0" sigma="0.1"
+           length="6.5" minGap="1.0" maxSpeed="24.0"
+           vClass="emergency" guiShape="passenger/sedan"
+           color="0.4,0.8,1.0"/>
+
     <!-- Corridor routes -->
     <route id="W_to_E_full" edges="W1_in W2_in W3_in W4_in"/>
     <route id="E_to_W_full" edges="W4_out W3_out W2_out W1_out"/>
@@ -73,10 +79,11 @@
     <vehicle id="yield_03" type="normal_car" route="N_w_to_E_turn" depart="54.2" departLane="best" departSpeed="10"/>
     <vehicle id="yield_04" type="normal_car" route="S_e_to_W_turn" depart="54.4" departLane="best" departSpeed="10"/>
     <vehicle id="ambulance_01" type="ambulance" route="S_w_to_N_e_turn" depart="55.0" departLane="best" departSpeed="13.0"/>
-    <vehicle id="firetruck_01" type="firetruck" route="N_e_to_S_w_turn" depart="56.0" departLane="best" departSpeed="12.0"/>
-
     <!-- Red-light violators (highlighted pink by controller) -->
     <vehicle id="rlv_01" type="normal_car" route="N_c_to_S_c" depart="55.3" departLane="best" departSpeed="12"/>
     <vehicle id="rlv_02" type="normal_car" route="E_to_W_full" depart="55.5" departLane="best" departSpeed="12"/>
+    <vehicle id="firetruck_01" type="firetruck" route="N_e_to_S_w_turn" depart="55.6" departLane="best" departSpeed="12.5"/>
     <vehicle id="rlv_03" type="normal_car" route="S_c_to_N_c" depart="56.1" departLane="best" departSpeed="12"/>
+    <vehicle id="ambulance_02" type="ambulance" route="W_to_E_full" depart="56.2" departLane="best" departSpeed="13.5"/>
+    <vehicle id="rescue_01" type="rescue_ev" route="S_c_to_N_c" depart="56.8" departLane="best" departSpeed="12.5"/>
 </routes>
